@@ -1,6 +1,7 @@
 import cv2
 
 from methods import proposed_ace, linear_um, cubic_um, rational_um, os_laplacian_enhancement
+from improved_method import perfectly_balanced_ace
 from evaluations import calculate_vr, calculate_nar
 
 def process_and_compare(path):
@@ -13,6 +14,7 @@ def process_and_compare(path):
         "Cubic UM": cubic_um,
         "OS Laplacian": os_laplacian_enhancement,
         "Rational UM": rational_um,
+        "Perfectly Balanced ACE": perfectly_balanced_ace,
     }
 
     results = {"Original": orig}

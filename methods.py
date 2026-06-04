@@ -45,7 +45,7 @@ def proposed_ace(image, alpha=7.0, a=1, b=7, c=21, K=1.0):
     output = img + gain * detail
     return np.clip(output, 0, 255).astype(np.uint8)
 
-def linear_um(image, gain=1.0):
+def linear_um(image, gain=0.5):
     """Linear Unsharp Masking sử dụng Laplacian filter {-1, 2, -1} [1, 9]"""
     img = image.astype(np.float32)
     # Áp dụng bộ lọc Laplacian 1D theo hàng
@@ -66,7 +66,7 @@ def cubic_um(image, gain=0.5):
     output = img + gain * (detail ** 3) / (128**2) # Tăng cường phi tuyến
     return np.clip(output, 0, 255).astype(np.uint8)
 
-def rational_um(image, gain=2.0):
+def rational_um(image, gain=1.0):
     """Mô phỏng Rational UM: Sử dụng hàm hữu tỉ để giảm o/u shooting [11, 12]"""
     img = image.astype(np.float32)
     mu = cv2.GaussianBlur(img, (1, 5), 0)
@@ -78,7 +78,7 @@ def rational_um(image, gain=2.0):
 
 from scipy.ndimage import median_filter
 
-def os_laplacian_enhancement(image, gain=1.2, window_size=3):
+def os_laplacian_enhancement(image, gain=0.5, window_size=3):
     """
     Triển khai phương pháp OS Laplacian (Order Statistics Laplacian).
     

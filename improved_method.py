@@ -13,29 +13,38 @@ def yeni_local_mean(image, alpha_edge=7.0, alpha_texture=1.5):
     rows, cols = img.shape
 
     # --------------------------------------------------
-    # 1. Edge density map
+    # 1. Edge density + edge strength
     # --------------------------------------------------
-    # Làm mờ nhẹ ảnh trước khi tính đạo hàm để tránh nhiễu hạt (noise) bị hiểu nhầm là texture
     img_smooth = cv2.GaussianBlur(img, (3, 3), 0)
-    
+
     gx = cv2.Sobel(img_smooth, cv2.CV_32F, 1, 0, ksize=3)
     gy = cv2.Sobel(img_smooth, cv2.CV_32F, 0, 1, ksize=3)
 
     grad = np.sqrt(gx**2 + gy**2)
 
-    # Lọc ngưỡng để tìm các điểm thực sự là cạnh
+    # Edge density
     edge = (grad > 20).astype(np.float32)
-
-    # Tính mật độ (Density) bằng một kernel đủ rộng
     density = cv2.blur(edge, (9, 9))
-    density = np.clip(density, 0, 1) # Đảm bảo density luôn nằm trong khoảng [0, 1]
+    density = np.clip(density, 0, 1)
+
+    # Edge strength
+    strength = grad / (grad.max() + 1e-6)
+    strength = cv2.GaussianBlur(strength, (5, 5), 0)
+    strength = np.clip(strength, 0, 1)
 
     # --------------------------------------------------
-    # * ĐIỂM CHÍNH LÀ ĐÂY: NỘI SUY ALPHA *
-    # Density = 0 (phẳng hoặc 1 nét đơn) -> alpha_map = alpha_edge (Giữ sắc nét)
-    # Density = 1 (cỏ, tóc dày đặc)     -> alpha_map = alpha_texture (Ép làm mờ)
+    # Texture score
     # --------------------------------------------------
-    alpha_map = alpha_edge * (1.0 - density) + alpha_texture * density
+    texture_score = density * (1.0 - strength)
+
+    # --------------------------------------------------
+    # Adaptive alpha
+    # --------------------------------------------------
+    alpha_map = (
+        alpha_edge * (1.0 - texture_score)
+        +
+        alpha_texture * texture_score
+    )
 
     # --------------------------------------------------
     # 2. Forward filter

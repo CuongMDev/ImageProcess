@@ -1,5 +1,6 @@
 import numpy as np
 import cv2
+from scipy.ndimage import gaussian_filter, maximum_filter, median_filter, minimum_filter
 
 def yeni_local_mean(image, alpha=7.0):
     """Tính toán mặt nạ mờ Mu(m,n) bằng bộ lọc YENI [2-5]"""
@@ -45,65 +46,56 @@ def proposed_ace(image, alpha=7.0, a=1, b=7, c=21, K=1.0):
     output = img + gain * detail
     return np.clip(output, 0, 255).astype(np.uint8)
 
-def linear_um(image, gain=0.5):
-    """Linear Unsharp Masking sử dụng Laplacian filter {-1, 2, -1} [1, 9]"""
+def linear_um(image, gain=1.0, sigma=1.0):
     img = image.astype(np.float32)
-    # Áp dụng bộ lọc Laplacian 1D theo hàng
-    kernel = np.array([[-1, 2, -1]], dtype=np.float32)
-    laplacian = cv2.filter2D(img, -1, kernel)
-    output = img + gain * laplacian
+
+    # LPF: Gaussian blur 2D (chuẩn paper)
+    lpf = gaussian_filter(img, sigma=sigma)
+
+    detail = img - lpf
+    output = img + gain * detail
+
     return np.clip(output, 0, 255).astype(np.uint8)
 
 # LƯU Ý: Các phương pháp Cubic, Rational và OS Laplacian dưới đây được mô phỏng 
 # dựa trên đặc điểm mô tả trong tài liệu (vùng [10-12]), vì công thức 
 # chi tiết nằm ở các tài liệu tham khảo ngoài.
 
-def cubic_um(image, gain=0.5):
-    """Mô phỏng Cubic UM: Tăng cường dựa trên lũy thừa bậc 3 của chi tiết [10, 11]"""
+def cubic_um(image, gain=0.0005, sigma=1.0):
     img = image.astype(np.float32)
-    mu = cv2.GaussianBlur(img, (1, 5), 0) # Lọc thông thấp theo hàng
+
+    mu = gaussian_filter(img, sigma=sigma)
     detail = img - mu
-    output = img + gain * (detail ** 3) / (128**2) # Tăng cường phi tuyến
+
+    # signed cubic (chuẩn paper)
+    detail_cubic = np.sign(detail) * (np.abs(detail) ** 3)
+
+    output = img + gain * detail_cubic
+
     return np.clip(output, 0, 255).astype(np.uint8)
 
-def rational_um(image, gain=1.0):
-    """Mô phỏng Rational UM: Sử dụng hàm hữu tỉ để giảm o/u shooting [11, 12]"""
+def rational_um(image, gain=1.0, h=0.01, sigma=1.0):
     img = image.astype(np.float32)
-    mu = cv2.GaussianBlur(img, (1, 5), 0)
+
+    mu = gaussian_filter(img, sigma=sigma)
     detail = img - mu
-    # Hàm hữu tỉ dạng k*d / (1 + h*d^2)
-    rational_gain = gain / (1 + (detail/25)**2)
-    output = img + rational_gain * detail
+
+    output = img + (gain * detail) / (1.0 + h * (detail ** 2))
+
     return np.clip(output, 0, 255).astype(np.uint8)
 
-from scipy.ndimage import median_filter
-
-def os_laplacian_enhancement(image, gain=0.5, window_size=3):
-    """
-    Triển khai phương pháp OS Laplacian (Order Statistics Laplacian).
-    
-    Tham số:
-    - image: Ảnh đầu vào (Grayscale).
-    - gain: Hệ số tăng cường (thường được điều chỉnh để cân bằng artifacts).
-    - window_size: Kích thước cửa sổ thống kê thứ tự (1D).
-    """
+def os_laplacian_um(image, gain=0.5, size=3):
     img = image.astype(np.float32)
-    rows, cols = img.shape
-    output = np.zeros_like(img)
 
-    # Xử lý theo từng hàng (row-wise) như mô tả trong tài liệu [5]
-    for i in range(rows):
-        row = img[i, :]
-        
-        # OS Laplacian thường sử dụng sự khác biệt giữa điểm ảnh hiện tại 
-        # và một giá trị thống kê thứ tự (ví dụ: trung vị - Median) [1]
-        # Điều này tạo ra các vùng cường độ dạng mảng (patch-like regions).
-        local_median = median_filter(row, size=window_size)
-        
-        # L_os = x(n) - Median(W)
-        detail_mask = row - local_median
-        
-        # Công thức tăng cường: y = x + gain * detail_mask
-        output[i, :] = row + gain * detail_mask
-        
+    # Tính min, med, max độc lập trên toàn bộ ảnh bằng C-backend của scipy
+    pmin = minimum_filter(img, size=size)
+    pmed = median_filter(img, size=size)
+    pmax = maximum_filter(img, size=size)
+
+    # Kết hợp OS smoothing
+    os_base = 0.25 * pmin + 0.5 * pmed + 0.25 * pmax
+
+    detail = img - os_base
+    output = img + gain * detail
+
     return np.clip(output, 0, 255).astype(np.uint8)

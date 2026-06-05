@@ -1,8 +1,8 @@
 import cv2
 
-from methods import proposed_ace, linear_um, cubic_um, rational_um, os_laplacian_enhancement
+from methods import proposed_ace, linear_um, cubic_um, rational_um, os_laplacian_um
 from improved_method import perfectly_balanced_ace
-from evaluations import calculate_vr, calculate_nar
+from evaluations import calculate_vr, calculate_nar, calculate_tenengrad, calculate_eme
 
 def process_and_compare(path):
     orig = cv2.imread(path, cv2.IMREAD_GRAYSCALE)
@@ -12,7 +12,7 @@ def process_and_compare(path):
         "Proposed ACE (YENI)": proposed_ace,
         "Linear UM": linear_um,
         "Cubic UM": cubic_um,
-        "OS Laplacian": os_laplacian_enhancement,
+        "OS Laplacian": os_laplacian_um,
         "Rational UM": rational_um,
         "Perfectly Balanced ACE": perfectly_balanced_ace,
     }
@@ -28,6 +28,8 @@ def process_and_compare(path):
                 name,
                 calculate_vr(orig, enhanced),
                 calculate_nar(orig, method),
+                calculate_tenengrad(enhanced),
+                calculate_eme(enhanced),
             )
         )
     
@@ -36,13 +38,16 @@ def process_and_compare(path):
     print("Đã xuất các file so sánh.")
 
     print("Đánh giá:")
-    for name, vr, nar in evaluations:
-        print(f"- {name}: VR = {vr:.4f}, NAR = {nar:.4f}")
+    for name, vr, nar, tenengrad, eme in evaluations:
+        print(
+            f"- {name}: VR = {vr:.4f}, NAR = {nar:.4f}, "
+            f"Tenengrad = {tenengrad:.4f}, EME = {eme:.4f}"
+        )
 
 
 def main():
     """Điểm vào chương trình: đọc ảnh đầu vào và xuất các ảnh so sánh."""
-    process_and_compare("image.png")
+    process_and_compare("image4.png")
 
 
 if __name__ == "__main__":

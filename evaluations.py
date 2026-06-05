@@ -1,6 +1,50 @@
 import numpy as np
 import cv2
 
+def calculate_tenengrad(image):
+    """
+    Tính Tenengrad (Sharpness) dựa trên độ dốc Sobel.
+    """
+    if image.ndim != 2:
+        raise ValueError("Tenengrad chỉ áp dụng cho ảnh grayscale.")
+
+    img = image.astype(np.float32)
+    gx = cv2.Sobel(img, cv2.CV_32F, 1, 0, ksize=3)
+    gy = cv2.Sobel(img, cv2.CV_32F, 0, 1, ksize=3)
+    grad_mag_sq = gx * gx + gy * gy
+    return float(np.mean(grad_mag_sq))
+
+def calculate_eme(image, block_size=(8, 8), eps=1e-6):
+    """
+    Tính EME (Enhancement Measure Estimation) - đo mức tương phản cục bộ.
+    Chia ảnh thành các khối và tính 20*log10(max/min) rồi lấy trung bình.
+    """
+    if image.ndim != 2:
+        raise ValueError("EME chỉ áp dụng cho ảnh grayscale.")
+
+    h, w = image.shape
+    bh, bw = block_size
+    if bh <= 0 or bw <= 0:
+        raise ValueError("block_size phải > 0.")
+
+    # Cắt ảnh để chia hết theo block_size
+    h_crop = h - (h % bh)
+    w_crop = w - (w % bw)
+    img = image[:h_crop, :w_crop].astype(np.float32)
+
+    eme_sum = 0.0
+    block_count = 0
+
+    for y in range(0, h_crop, bh):
+        for x in range(0, w_crop, bw):
+            block = img[y:y + bh, x:x + bw]
+            block_max = float(block.max())
+            block_min = float(block.min())
+            eme_sum += 20.0 * np.log10((block_max + eps) / (block_min + eps))
+            block_count += 1
+
+    return eme_sum / block_count if block_count > 0 else 0.0
+
 def calculate_vr(original, enhanced):
     """
     Tính tỷ lệ phương sai cục bộ vùng không chứa cạnh (VR).
